@@ -4,9 +4,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from src.utils.misc_utils.convert_seconds import convert_seconds
-from src.utils.misc_utils.get_class_name import get_class_name
-from src.metrics.UNet.metrics import DiceCoefficient
+from ..utils.misc_utils import convert_seconds, get_class_name
+from ..metrics import DiceCoefficient
 
 
 class SegmentationTrainer(nn.Module):
@@ -65,7 +64,7 @@ class SegmentationTrainer(nn.Module):
 
         # Default arguments
         default_loss = nn.BCELoss() if classes == 2 else nn.CrossEntropyLoss()
-        default_metric = DiceCoefficient(num_classes=self.classes)
+        default_metric = DiceCoefficient(reduction='mean')
         default_optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
 
         # Define training arguments

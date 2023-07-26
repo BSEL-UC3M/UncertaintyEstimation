@@ -21,13 +21,13 @@ class DiceCoefficient(nn.Module):
         per-class performance. Defaults to False.
     """
 
-    def __init__(self, num_classes, epsilon=1e-5, classwise=False):
+    def __init__(self, reduction='mean', epsilon=1e-5, classwise=False):
         super(DiceCoefficient, self).__init__()
-        self.num_classes = num_classes
+        self.reduction = reduction
         self.epsilon = epsilon
         self.classwise = classwise
 
-    def forward(self, inputs, targets, logits=False):
+    def forward(self, input, target):
         """
         Compute the Dice coefficient.
 
@@ -37,48 +37,48 @@ class DiceCoefficient(nn.Module):
             Predicted inputs, which can be logits or probabilities.
         targets : torch.Tensor
             Target labels.
-        logits : bool, optional
-            Determine whether or not the inputs are logits of probabilities. If
-            true, the inputs are converted to probabilities. Defaults to False.
+        reduction : str or None, optional
 
         Returns
         -------
-        dice_coefficient : torch.Tensor
-            Dice coefficient.
+        dice_loss : torch.Tensor
+            Dice loss.
         """
-        # Convert the inputs to probabilities if they are logits
-        if logits:
-            # Use sigmoid if the problem is binary
-            if self.num_classes == 2:
-                probs = F.sigmoid(inputs)
-            # Use softmax if the problem is multiclass
-            else:
-                probs = F.softmax(inputs, dim=1)
 
+        n_classes = input.shape[1]
+        assert input.shape[1] == target.shape[1], 'Targets and inputs should match in labels'
+
+        # Convert the inputs to probabilities if they are logits
+        if not torch.all((input >= 0) & (input <= 1)):
+            probs = torch.sigmoid(input) if n_classes == 2 else F.softmax(input, dim=1)
         else:
-            probs = inputs
+            probs = input
 
         # Reshape probs and targets to [batch_size, num_classes, -1]
-        probs = probs.view(probs.size(0), self.num_classes, -1)
-        targets = targets.view(targets.size(0), self.num_classes, -1)
+        probs = probs.view(probs.size(0), n_classes, -1)
+        targets = target.view(target.size(0), n_classes, -1)
 
         # Compute the intersection between samples
         intersection = torch.sum(probs * targets, dim=2)
 
-        # Compute numerator and denominator for Dice coefficient
+        # Compute numerator and denominator for Dice loss
         numerator = 2 * intersection
         denominator = torch.sum(probs, dim=2) + torch.sum(targets, dim=2)
 
-        # Compute Dice coefficient per class
+        # Compute Dice loss per class
         dice_per_class = (numerator + self.epsilon) / (denominator + self.epsilon)
 
-        # Choose whether or not to return the coefficient per class
-        if self.classwise:
-            dice_coefficient = torch.mean(dice_per_class, dim=0)
-        else:
-            dice_coefficient = torch.mean(dice_per_class)
+        # Choose whether or not to return the loss per class. Also choose reduction.
+        if self.reduction == 'mean' or self.reduction is None:
+            if self.classwise:
+                dice_coef = torch.mean(dice_per_class, dim=0)
+            else:
+                dice_coef = torch.mean(dice_per_class)
 
-        return dice_coefficient
+        elif self.reduction == 'sum':
+            dice_coef = torch.sum(dice_per_class)
+
+        return dice_coef
 
 
 class KLDivergence(nn.Module):

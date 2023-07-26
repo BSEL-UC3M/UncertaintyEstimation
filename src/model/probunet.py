@@ -185,8 +185,10 @@ class ProbabilisticUNet(nn.Module):
         # Calculate the posterior distribution if we are training
         if train is True:
             self.posterior = self.posterior_net(x, y)
+            return self.segmentation, self.prior, self.posterior
 
-        return self.segmentation, self.prior, self.posterior
+        else:
+            return self.segmentation, self.prior
 
     def sample(self, train=False):
         """

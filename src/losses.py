@@ -105,7 +105,7 @@ class DiceLoss(nn.Module):
 
 class ELBOLoss(nn.Module):
     """
-    Evidence Lower Bound (ELBO) loss for Variational Autoencoders (VAEs).
+    Evidence Lower Bound (ELBO) loss for Probabilistic U-Net.
 
     Parameters
     ----------
@@ -175,11 +175,11 @@ class ELBOLoss(nn.Module):
         self.kl_divergence = torch.mean(self.kl(prior, posterior))
 
         # Compute both reconstruction losses
-        bce_loss = self.bce(input=reconstruction, target=target)
+        # bce_loss = self.bce(input=reconstruction, target=target)
         dice_loss = self.dice(input=reconstruction, target=target)
 
         # Define reconstruction loss
-        self.reconstruction_loss = bce_loss + dice_loss
+        self.reconstruction_loss = dice_loss
 
         # Define elbo loss
         elbo_loss = -(self.reconstruction_loss + self.beta * self.kl_divergence)

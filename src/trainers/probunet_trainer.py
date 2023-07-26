@@ -5,7 +5,7 @@ import time
 
 from ..utils.misc_utils import convert_seconds
 from ..utils.train_utils import l2_regularization
-from ..metrics.losses import ELBOLoss
+from ..losses import ELBOLoss
 
 
 class ProbUnetTrainer:
@@ -17,7 +17,7 @@ class ProbUnetTrainer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 
-        self.elbo = ELBOLoss(reduction='mean', beta=beta)
+        self.elbo = ELBOLoss(reduction='sum', beta=beta)
 
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
 

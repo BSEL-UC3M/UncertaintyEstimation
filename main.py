@@ -4,8 +4,14 @@ from torch.utils.data import DataLoader, random_split
 from src.dataset.dataset import UryToxDataset
 from src.dataset.transforms import Resize
 
+# ProbUnet training
 from src.model.probunet import ProbabilisticUNet
 from src.trainers.probunet_trainer import ProbUnetTrainer
+
+# U-Net training
+from src.trainers.segtrainer import SegmentationTrainer
+from src.model.unet import UNet
+from src.losses import DiceLoss
 
 
 def load_urytox(path):
@@ -91,6 +97,15 @@ def create_dataloaders(dataset, seed, batch_size, train_size, val_size=0.15):
     return trainloader, validloader, testloader
 
 
+def train_unet(trainloader, validloader, testloader):
+    loss = DiceLoss()
+    model = UNet(in_channels=1, n_classes=2, filter_factor=2, logits=True, is3d=True)
+    trainer = SegmentationTrainer(model, classes=2, loss=loss, learning_rate=1e-4)
+
+    tr_loss, val_loss = trainer.fit(trainloader, validloader, epochs=100)
+    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/test_bladder_unet.pth'))
+
+
 def train_probunet(trainloader, validloader, testloader):
     model = ProbabilisticUNet(in_channels=1,
                               n_classes=2,
@@ -101,11 +116,11 @@ def train_probunet(trainloader, validloader, testloader):
                               logits=True,
                               is3d=True)
 
-    trainer = ProbUnetTrainer(model, beta=1e-3, learning_rate=1e-4)
+    trainer = ProbUnetTrainer(model, beta=0, learning_rate=1e-3)
 
     tr_loss, val_loss = trainer.fit(trainloader, validloader, epochs=100)
 
-    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/test_bladder_mean_nologits.pth'))
+    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/test_bladder_justunet.pth'))
 
 
 def main():
@@ -124,7 +139,7 @@ def main():
     trainloader, validloader, testloader = create_dataloaders(
         urytox_dataset, seed, batch_size=2, train_size=0.7)
 
-    train_probunet(trainloader, validloader, testloader)
+    train_unet(trainloader, validloader, testloader)
 
 
 if __name__ == '__main__':
