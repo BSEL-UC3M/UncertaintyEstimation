@@ -103,7 +103,7 @@ class DiceLoss(nn.Module):
         return dice_loss
 
 
-class ELBOLoss(nn.Module):
+class ELBOProbUnetLoss(nn.Module):
     """
     Evidence Lower Bound (ELBO) loss for Probabilistic U-Net.
 
@@ -143,7 +143,7 @@ class ELBOLoss(nn.Module):
     """
 
     def __init__(self, beta, reduction=None, analytic_kl=True):
-        super(ELBOLoss, self).__init__()
+        super(ELBOProbUnetLoss, self).__init__()
         self.beta = beta
         self.kl = KLDivergence(analytic=analytic_kl)
         self.bce = nn.BCEWithLogitsLoss(reduction=reduction)
@@ -180,6 +180,31 @@ class ELBOLoss(nn.Module):
 
         # Define reconstruction loss
         self.reconstruction_loss = dice_loss
+
+        # Define elbo loss
+        elbo_loss = -(self.reconstruction_loss + self.beta * self.kl_divergence)
+
+        return elbo_loss
+
+
+class ELBOLoss(nn.Module):
+    def __init__(self, beta, reduction=None):
+        super(ELBOLoss, self).__init__()
+        self.beta = beta
+        self.bce = nn.BCEWithLogitsLoss(reduction=reduction)
+        self.dice = DiceLoss(reduction=reduction, classwise=False)
+
+    def forward(self, reconstruction, target, mu, logvar):
+        # Compute the mean batch KL divergence
+        var = torch.exp(logvar)
+        self.kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - var)
+
+        # Compute both reconstruction losses
+        bce_loss = self.bce(input=reconstruction, target=target)
+        # dice_loss = self.dice(input=reconstruction, target=target)
+
+        # Define reconstruction loss
+        self.reconstruction_loss = bce_loss
 
         # Define elbo loss
         elbo_loss = -(self.reconstruction_loss + self.beta * self.kl_divergence)

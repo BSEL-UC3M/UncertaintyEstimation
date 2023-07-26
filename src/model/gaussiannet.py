@@ -219,7 +219,7 @@ class GaussianNet(nn.Module):
 
         return mu, logvar
 
-    def forward(self, x, label=None):
+    def forward(self, x, label=None, return_params=False):
         """
         Forward pass of the GaussianNet. Applied the encoding process and the
         computation of the mean and logarithmic variance, which are then used
@@ -256,11 +256,15 @@ class GaussianNet(nn.Module):
         # Compute the mean and the logarithmic variance
         mu, logvar = self._compute_mu_logvar(x)
 
-        # Compute the variance
-        var = torch.exp(0.5 * logvar)
+        if return_params is True:
+            return mu, logvar
 
-        # Generate an axis-aligned (diagonal) covariance multivariate gaussian
-        gaussian = MultivariateNormal(loc=mu, scale_tril=torch.diag_embed(var))
-        # gaussian = Independent(Normal(loc=mu, scale=var), 1)
+        else:
+            # Compute the standard deviation
+            std = torch.exp(0.5 * logvar)
 
-        return gaussian
+            # Generate an axis-aligned (diagonal) covariance multivariate gaussian
+            gaussian = MultivariateNormal(loc=mu, scale_tril=torch.diag_embed(std))
+            # gaussian = Independent(Normal(loc=mu, scale=std), 1)
+
+            return gaussian

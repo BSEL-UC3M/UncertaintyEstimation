@@ -5,8 +5,9 @@ from src.dataset.dataset import UryToxDataset
 from src.dataset.transforms import Resize
 
 # ProbUnet training
-from src.model.probunet import ProbabilisticUNet
+from src.model.probunet import ProbabilisticUNet, UNet_VAE
 from src.trainers.probunet_trainer import ProbUnetTrainer
+from src.trainers.unet_vae_trainer import UNetVaeTrainer
 
 # U-Net training
 from src.trainers.segtrainer import SegmentationTrainer
@@ -123,6 +124,23 @@ def train_probunet(trainloader, validloader, testloader):
     trainer.save(os.path.join(os.getcwd(), 'results/trained_models/test_bladder_justunet.pth'))
 
 
+def train_unetvae(trainloader, validloader, testloader):
+    model = UNet_VAE(in_channels=1,
+                     n_classes=2,
+                     latent_dim=6,
+                     linear_dim=14 ** 3,
+                     unet_factor=2,
+                     vae_factor=2,
+                     logits=True,
+                     is3d=True)
+
+    trainer = UNetVaeTrainer(model, beta=10, learning_rate=1e-3)
+
+    tr_loss, val_loss = trainer.fit(trainloader, validloader, epochs=150)
+
+    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/unetvae_bladder.pth'))
+
+
 def main():
     # Check device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -139,7 +157,7 @@ def main():
     trainloader, validloader, testloader = create_dataloaders(
         urytox_dataset, seed, batch_size=2, train_size=0.7)
 
-    train_unet(trainloader, validloader, testloader)
+    train_unetvae(trainloader, validloader, testloader)
 
 
 if __name__ == '__main__':

@@ -290,3 +290,125 @@ class ProbabilisticUNet(nn.Module):
         reconstructed_seg = self.fcomb(self.segmentation, z_posterior)
 
         return reconstructed_seg
+
+
+class UNet_VAE(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 n_classes,
+                 latent_dim,
+                 linear_dim,
+                 unet_nlayers=4,
+                 vae_nlayers=4,
+                 unet_factor=1,
+                 vae_factor=1,
+                 logits=True,
+                 kohl=True,
+                 is3d=False):
+        super(UNet_VAE, self).__init__()
+
+        self.logits = logits
+        self.n_classes = n_classes
+
+        # Define the components of the ProbUnet
+        self.unet = UNet(in_channels=in_channels,
+                         n_classes=n_classes,
+                         n_layers=unet_nlayers,
+                         filter_factor=unet_factor,
+                         dropout_p=0.5,
+                         logits=logits,
+                         is3d=is3d
+                         )
+        self.prior_net = GaussianNet(in_channels=in_channels,
+                                     n_classes=n_classes,
+                                     latent_dim=latent_dim,
+                                     n_layers=vae_nlayers,
+                                     filter_factor=vae_factor,
+                                     posterior=False,
+                                     kohl=kohl,
+                                     linear_dim=linear_dim,
+                                     is3d=is3d
+                                     )
+        self.fcomb = FComb(n_classes=n_classes,
+                           latent_dim=latent_dim,
+                           hidden_size=64 // unet_factor,
+                           logits=logits,
+                           is3d=is3d,
+                           )
+
+        # Initialize the weights as orthogonal
+        # self._initialize_orthogonal_weights()
+
+    def _initialize_orthogonal_weights(self):
+        """
+        Set the weight initialization.
+        """
+        # Iterate over the modules of the network
+        for m in self.modules():
+            # Initialize the weights of the conv layers, bn layers and linear layers
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Conv3d):
+                init.orthogonal_(m.weight)
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm3d):
+                init.constant_(m.weight, 1)
+                init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                init.orthogonal_(m.weight)
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+
+    def forward(self, x, y, train=False):
+        # Get the segmentation from the U-Net
+        self.segmentation = self.unet(x)
+
+        # Find the prior distribution
+        self.mu, self.logvar = self.prior_net.forward(x, return_params=True)
+
+        return self.segmentation, self.mu, self.logvar
+
+    def sample(self):
+        # Apply the reparameterization trick
+        eps = torch.rand_like(self.logvar)
+        std = torch.exp(0.5 * self.logvar)
+
+        # Obtain the sample
+        z_prior = self.mu + eps * std
+
+        # Combine the segmentation with the sample
+        sampled_seg = self.fcomb(self.segmentation, z_prior)
+
+        return sampled_seg
+
+    def sample_n(self, n, train=False):
+        """
+        Generates 'm' samples obtained from the prior distribution and combines
+        then with the segmentation obtained by the U-Net using fcomb().
+
+        Parameters
+        ----------
+        n : int
+            Number of samples to generate.
+        train : bool
+            Parameter called when training, which is used to generate the
+            samples using the reparameterization trick to allow the computation
+            of gradients. Defaults to False.
+
+        Returns
+        -------
+        sampled_segs : torch.Tensor
+            Probabilistic segmentation. Has shape [m, B, L, *D, H, H]
+        """
+
+        # Initialize an empty list to store the sampled reconstructions
+        sampled_reconstructions = []
+
+        # Sample 'm' times from the prior distribution
+        for _ in range(n):
+            sampled_reconstruction = self.sample()
+            sampled_reconstructions.append(sampled_reconstruction)
+
+        # Stack the sampled reconstructions along a new dimension
+        sampled_segs = torch.stack(sampled_reconstructions, dim=0)
+
+        return sampled_segs
