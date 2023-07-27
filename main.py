@@ -36,7 +36,7 @@ def load_urytox(path):
     # Load the data
     dataset = UryToxDataset(path, organ='b', transform=Resize(scale_factor=0.5))
 
-    dataset.plotitem(4, 56)
+    # dataset.plotitem(4, 56)
 
     # Check that the sizes are correct
     image, label, _ = dataset[0]
@@ -127,18 +127,18 @@ def train_probunet(trainloader, validloader, testloader):
 def train_unetvae(trainloader, validloader, testloader):
     model = UNet_VAE(in_channels=1,
                      n_classes=2,
-                     latent_dim=6,
+                     latent_dim=10,
                      linear_dim=14 ** 3,
                      unet_factor=2,
                      vae_factor=2,
                      logits=True,
                      is3d=True)
 
-    trainer = UNetVaeTrainer(model, beta=10, learning_rate=1e-3)
+    trainer = UNetVaeTrainer(model, beta=10, learning_rate=1e-4)
 
     tr_loss, val_loss = trainer.fit(trainloader, validloader, epochs=150)
 
-    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/unetvae_bladder.pth'))
+    trainer.save(os.path.join(os.getcwd(), 'results/trained_models/unetvae_bladder_dice.pth'))
 
 
 def main():

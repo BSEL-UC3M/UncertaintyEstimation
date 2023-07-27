@@ -315,7 +315,7 @@ class UNet_VAE(nn.Module):
                          n_classes=n_classes,
                          n_layers=unet_nlayers,
                          filter_factor=unet_factor,
-                         dropout_p=0.5,
+                         dropout_p=0,
                          logits=logits,
                          is3d=is3d
                          )

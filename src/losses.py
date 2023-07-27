@@ -56,7 +56,6 @@ class DiceLoss(nn.Module):
             Predicted inputs, which can be logits or probabilities.
         targets : torch.Tensor
             Target labels.
-        reduction : str or None, optional
 
         Returns
         -------
@@ -201,10 +200,10 @@ class ELBOLoss(nn.Module):
 
         # Compute both reconstruction losses
         bce_loss = self.bce(input=reconstruction, target=target)
-        # dice_loss = self.dice(input=reconstruction, target=target)
+        dice_loss = self.dice(input=reconstruction, target=target)
 
         # Define reconstruction loss
-        self.reconstruction_loss = bce_loss
+        self.reconstruction_loss = dice_loss
 
         # Define elbo loss
         elbo_loss = -(self.reconstruction_loss + self.beta * self.kl_divergence)

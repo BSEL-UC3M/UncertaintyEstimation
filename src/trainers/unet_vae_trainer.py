@@ -10,7 +10,8 @@ from ..metrics import DiceCoefficient
 
 
 class UNetVaeTrainer:
-    def __init__(self, model, beta, l2=1e-5, learning_rate=1e-4):
+    def __init__(self, model, beta, l2=1e-5, annealing_rate=1.2, annealing_th=0.02,
+                 learning_rate=1e-4):
         self.model = model
         self.learning_rate = learning_rate
         self.l2 = l2
@@ -22,6 +23,20 @@ class UNetVaeTrainer:
         self.dice = DiceCoefficient()
 
         self.optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate)
+
+        self.dice_threshold = annealing_th
+        self.annealing_rate = annealing_rate
+        self.prev_train_dice = 0.0
+
+    def kl_annealing(self, dice):
+        if dice - self.prev_train_dice > self.dice_threshold:
+            # Increase the KL weight for more regularization
+            self.elbo.beta *= self.annealing_rate
+        else:
+            # Decrease the KL weight for less regularization
+            self.elbo.beta /= (self.annealing_rate * 2 / 3)
+
+        print(f'\nBeta updated to {self.elbo.beta}')
 
     def fit(self, trainloader, validloader, epochs):
         scheduler = optim.lr_scheduler.MultiStepLR(
@@ -64,7 +79,7 @@ class UNetVaeTrainer:
                 l2_norm = (l2_regularization(self.model.prior_net) +
                            l2_regularization(self.model.fcomb)
                            )
-                loss = -elbo + self.l2 * l2_norm
+                loss = -elbo
 
                 # Get the total losses per batch
                 tr_loss += loss.item() * data.size(0)
@@ -89,6 +104,10 @@ class UNetVaeTrainer:
             train_losses[2, epoch] = tr_kl_div / len(trainloader.dataset)
 
             train_dice = train_dice / len(trainloader.dataset)
+
+            # Perform KL annealing
+            self.kl_annealing(train_dice)
+            self.prev_train_dice = train_dice
 
             # Set evaluation mode for validation
             self.model.eval()
@@ -122,7 +141,7 @@ class UNetVaeTrainer:
                 valid_losses[1, epoch] = val_recon_loss / len(validloader.dataset)
                 valid_losses[2, epoch] = val_kl_div / len(validloader.dataset)
 
-                valid_dice = valid_dice / len(trainloader.dataset)
+                valid_dice = valid_dice / len(validloader.dataset)
 
             # Print information after each epoch
             if (epoch % 1 == 0):
@@ -130,8 +149,8 @@ class UNetVaeTrainer:
 
                 print(f"\nEpoch {epoch + 1}/{epochs} - {epoch_time_str}\n"
                       f"-----------------------\n"
-                      f"Train ELBO: {train_losses[0, epoch]:.2f}\tTrain RL: {train_losses[1, epoch]:.2f}\tTrain KL: {train_losses[2, epoch]:.2f}\tTrain Dice: {train_dice}\n"
-                      f"Valid ELBO: {valid_losses[0, epoch]:.2f}\tValid RL: {valid_losses[1, epoch]:.2f}\tValid KL: {valid_losses[2, epoch]:.2f}\nValid Dice: {valid_dice}"
+                      f"Train ELBO: {train_losses[0, epoch]:.2f}\tTrain RL: {train_losses[1, epoch]:.2f}\tTrain KL: {train_losses[2, epoch]:.2f}\tTrain Dice: {train_dice:.2f}\n"
+                      f"Valid ELBO: {valid_losses[0, epoch]:.2f}\tValid RL: {valid_losses[1, epoch]:.2f}\tValid KL: {valid_losses[2, epoch]:.2f}\tValid Dice: {valid_dice:.2f}"
                       )
 
         # Get the time it has taken to train in HHh MMm SSs format

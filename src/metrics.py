@@ -10,8 +10,6 @@ class DiceCoefficient(nn.Module):
 
     Parameters
     ----------
-    num_classes : int
-        Number of classes of the problem.
     epsilon : float, optional
         Constant used to prevent division by zero and to improve stability.
         Defaults to 1e-5
@@ -21,9 +19,8 @@ class DiceCoefficient(nn.Module):
         per-class performance. Defaults to False.
     """
 
-    def __init__(self, reduction='mean', epsilon=1e-5, classwise=False):
+    def __init__(self, epsilon=1e-5, classwise=False):
         super(DiceCoefficient, self).__init__()
-        self.reduction = reduction
         self.epsilon = epsilon
         self.classwise = classwise
 
@@ -37,7 +34,6 @@ class DiceCoefficient(nn.Module):
             Predicted inputs, which can be logits or probabilities.
         targets : torch.Tensor
             Target labels.
-        reduction : str or None, optional
 
         Returns
         -------
@@ -69,14 +65,10 @@ class DiceCoefficient(nn.Module):
         dice_per_class = (numerator + self.epsilon) / (denominator + self.epsilon)
 
         # Choose whether or not to return the loss per class. Also choose reduction.
-        if self.reduction == 'mean' or self.reduction is None:
-            if self.classwise:
-                dice_coef = torch.mean(dice_per_class, dim=0)
-            else:
-                dice_coef = torch.mean(dice_per_class)
-
-        elif self.reduction == 'sum':
-            dice_coef = torch.sum(dice_per_class)
+        if self.classwise:
+            dice_coef = torch.mean(dice_per_class, dim=0)
+        else:
+            dice_coef = torch.mean(dice_per_class)
 
         return dice_coef
 
